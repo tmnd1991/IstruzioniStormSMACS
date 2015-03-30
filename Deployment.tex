@@ -1,0 +1,360 @@
+% XeLaTeX can use any Mac OS X font. See the setromanfont command below.
+% Input to XeLaTeX is full Unicode, so Unicode characters can be typed directly into the source.
+
+% The next lines tell TeXShop to typeset with xelatex, and to open and save the source with Unicode encoding.
+
+%!TEX TS-program = xelatex
+%!TEX encoding = UTF-8 Unicode
+
+\documentclass[12pt]{article}
+\usepackage{geometry}                % See geometry.pdf to learn the layout options. There are lots.
+\geometry{letterpaper}                   % ... or a4paper or a5paper or ... 
+%\geometry{landscape}                % Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}    % Activate to begin paragraphs with an empty line rather than an indent
+\usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage[T1]{fontenc}
+\usepackage[lighttt]{lmodern}
+
+% Will Robertson's fontspec.sty can be used to simplify font choices.
+% To experiment, open /Applications/Font Book to examine the fonts provided on Mac OS X,
+% and change "Hoefler Text" to any of these choices.
+
+\usepackage{fontspec,xltxtra,xunicode}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\lstset{
+    frame=single,
+    breaklines=true,
+    postbreak=\raisebox{0ex}[0ex][0ex]{\ensuremath{\color{red}\hookrightarrow\space}},
+    basicstyle=\ttfamily
+}
+\defaultfontfeatures{Mapping=tex-text}
+\setromanfont[Mapping=tex-text]{Hoefler Text}
+\setsansfont[Scale=MatchLowercase,Mapping=tex-text]{Gill Sans}
+\setmonofont[Scale=MatchLowercase]{Andale Mono}
+
+\title{Operativit\`a in Storm SMACS}
+\author{Murgia Antonio}
+\date{30/03/2015}% Activate to display a given date or no date
+
+\begin{document}
+\maketitle
+
+\section{Introduzione}
+In questo breve documento tecnico verranno esplicitate le procedure da eseguire per ottenere operativit\`a con gli strumenti: Scala, sbt e Apache Storm.
+Questo how-to \`e stato sviluppato in concomitanza con il progetto Storm SMACS con lo scopo di facilitare l'introduzione nel progetto di nuovi sviluppatori.\\
+La guida sar\`a divisa in due capitoli principali: la prima parte sar\`a particolamente dedicata a nuovi sviluppatori che vogliono contribuire allo sviluppo; la seconda invece si occuper\`a di fornire gli strumenti necessari per eseguire il deployment dell'architettura Storm SMACS.
+
+\section{Guida allo Sviluppo}
+Per ottenere operativit\`a all'interno del progetto Storm SMACS \`e necessario disporre dei seguenti strumenti di base, imprescindibili in qualunque ambiente di lavoro Scala: scalac (il compilatore Scala), sbt (simple build tool) e git, l'arcinoto sistema di versioning. Non ci addentreremo nel processo di installazione e setup poich\`e gli argomenti sono particolarmente ben coperti e variano rapidamente con l'evoluzione degli strumenti.\\
+Il progetto Storm SMACS \`e stato sviluppato utilizzando Scala versione 2.11.5 (la pi\`u recente al momento della scrittura) e Java SE versione 6.
+Da questo momento in poi daremo per scontata una conoscenza almeno marginale di ci\`o che \`e un tool di project e dependency management come sbt (o maven).\\
+Il progetto Storm SMACS \`e composto dai seguenti sotto progetti:\\
+\begin{itemize}
+\item stormSMACS
+\item ceilometerAPI4s
+\item scalaStorm (un fork della repository)
+\item utils
+\item cfAgent
+\item sigarAgent
+\end{itemize}
+In figura \`e possibile osservare le dipendenze che esistono tra i progetti.
+La prima cosa da fare \`e eseguire il clone delle repository di ognuno di questi progetti, per fare questo sar\`a necessario eseguire 	il seguente comando sostituendo a <link> il link di ogni progetto (che sar\`a disponibile in appendice):
+\begin{lstlisting}
+	git clone <link>
+\end{lstlisting}
+Solamente i progetti stormSMACS, cfAgent e sigarAgent sono eseguibili, i restanti rappresentano librerie in cui sono stati posti a fattor comune soluzioni a problemi ricorrenti.
+Per questo sar\`a necessario porsi tramite un terminale nella cartella principale dei progetti scalaUtils, scalaStorm e ceilometerAPI4s ed eseguire il seguente comando:
+\begin{lstlisting}
+	sbt publishLocal
+\end{lstlisting}
+In questo modo verranno pubblicati in una repository locale i seguenti artefatti (seguendo la convenzione Maven):
+\begin{itemize}
+\item it.unibo.ing.smacs.ceilometerAPI4s
+\item it.unibo.ing.utils
+\item com.github.velvia.scala-storm
+\end{itemize}
+Fatto questo sar\`a possibile compilare i progetti stormSMACS, cfAgent e sigarAgent, con il comando:
+\begin{lstlisting}
+	sbt compile
+\end{lstlisting}
+I progetti cfAgent e sigarAgent possono essere eseguiti in modo standalone semplicemente digitando il comando:
+\begin{lstlisting}
+	sbt run
+\end{lstlisting}
+Entrambi accettano un parametro di tipo intero che indica la porta da utilizzare per il web server, le porte di default sono:
+\begin{itemize}
+\item 9876 : cfAgent 
+\item 9875 : sigarAgent
+\end{itemize}
+Per quanto riguarda il testing del progetto stormSMACS \`e invece necessaria un'installazione funzionante di Apache Storm (la quale verr\`a coperta nel capitolo successivo). Apache Storm fortunatamente offre anche una modalit\`a di debug, che permette di eseguire l'intera topologia in thread locali per simulare il comportamento nel distribuito.
+In ogni caso per eseguire una topologia Storm \`e necessario un singolo file .jar il quale dovr\`a contenere tutte le dipendenze del progetto. \\
+Per poter generare tale file jar ci avvaleremo di un plugin per sbt: sbt-assembly.\\
+\`E possibile visitare la repository del progetto su github all'indirizzo: \url{http://github.com/sbt/sbt-assembly}\\
+In tale pagina sono fornite le istruzioni per installare il plugin, dopo averlo installato sar\`a sufficiente eseguire il comando:
+\begin{lstlisting}
+	sbt assembly
+\end{lstlisting}
+Quindi verr\`a creato un file con estensione jar nella cartella target/scala-2.11/.\\
+Per eseguire stormsmacs in modalit\`a debug \`e necessario eseguire il comando:
+\begin{lstlisting}
+storm jar target/scala-2.11/storm-smacs-assembly-1.0.jar it.unibo.ing.stormsmacs.topologies.Topology src/test/resources/emptyConf.json
+\end{lstlisting}
+Andiamo ad esplicitare i parametri passati al comando storm:\\
+Il primo parametro \emph{jar} indica a storm che vogliamo mettere in esecuzione un file jar.
+Il secondo parametro indica invece il percorso del jar.
+Il terzo parametro rappresenta la classe che fornisce il punto d'accesso alla topologia Storm e che ne esegue la configurazione.
+Il quarto parametro (che viene passato direttamente alla nostra topologia) indica un file di configurazione necessario e minimale per poter eseguire stormSMACS. Di seguito riportiamo il contenuto del file:
+\begin{lstlisting}
+{
+  "name"              : "test",
+  "persisterNode"     : {
+    "id"  : "fuseki",
+    "type": "FUSEKI",
+    "url" : "http://10.0.10.13:3030/ds/update"
+  },
+  "remote"            : false,
+  "debug"             : true,
+  "pollTime"          : 60000
+}
+\end{lstlisting}
+\emph{name} rappresenta il nome che verr\`a dato alla topologia in esecuzione, \emph{remote} \`e un parametro di configurazione di Storm, impostandolo a false, indica che la topologia non \`e eseguita in un ambiente remoto ma locale.
+\emph{debug} indica che deve essere eseguito in modalit\`a debug, quindi simulata su thread, ed infine il parametro pollTime indica la frequenza in millisecondi in cui \`e necessario effettuare il campionamento.
+Il parametro persisterNode indica l'endpoint SPARQL sul quale verranno salvati i dati raccolti da stormSMACS, in questa configurazione non \`e importante che rappresenti un endpoint valido.
+Un file completo pu\`o essere visionato nella cartella src/test/resources/confExample.json, all'interno del file sono definiti pi\`u nodi che si intende monitorare di diverse topologie, la loro configurazione \`e particolarmente banale e quindi non verr\`a trattata (self-explanatory code).\\
+Per quanto riguarda l'utilizzo di un IDE, il progetto non fa affidamento alla presenza di alcuno di essi e pu\`o essere quindi utilizzato con il vostro preferito. Personalmente ho giudicato IntelliJ l'IDE pi\`u maturo per quanto riguarda il panorama Scala, il quale offre un'ottima integrazione anche con sbt. Ad ogni modo consiglio di non allontanarsi mai troppo dalla linea di comando, la quale tramite sbt offre uno strumento formidabile.
+\section{Guida al Deployment}
+Tale guida \`e stata redatta in data 30/03/2015 e fa riferimento alla versione di Apache Storm 0.9.4.\\
+Essa \`e il frutto dell'esperienza maturata nello sviluppo del progetto e prende spunto dalla guida in lingua inglese presente all'indirizzo \url{http://www.michael-noll.com/tutorials/running-multi-node-storm-cluster/}\\
+\subsection{Configurazione di un cluster Apache Storm}
+Per ottenere l'operativit\`a di un cluster Storm \`e necessario configurare (almeno) 3 nodi, ognuno eseguir\`a un differente processo, storm nimbus, storm supervisor e zookeeper.
+Questa guida \`e stata testata utilizzando \emph{Ubuntu 14.04 LTS}.
+\subsubsection{Configurazione comune a tutte le macchine}
+In primo luogo \`e necessario installare Oracle JDK versione 6 e rimuovere la versione precedentemente installata di default (OpenJDK).
+Per farlo \`e necessario eseguire i seguenti comandi da una shell bash:
+\begin{lstlisting}
+sudo apt-get purge openjdk*
+sudo apt-get install python-software-properties
+sudo add-apt-repository ppa:webupd8team/java
+sudo apt-get update
+sudo apt-get install oracle-java6-installer
+\end{lstlisting}
+Quindi per comodit\`a arricchiremo il file \texttt{/etc/hosts} in modo da poter riferire le macchine del nostro cluster attraverso un nome e non l'indirizzo IP:
+\begin{lstlisting}
+192.168.10.1    slave
+192.168.10.200  nimbus
+192.168.10.250  zkserver
+\end{lstlisting}
+Inoltre sar\`a necessario installare \emph{supervisord} un tool che permette di porre sotto supervision e di eseguire allo startup i processi necessari.
+\begin{lstlisting}
+sudo apt-get install supervisor
+\end{lstlisting}
+\subsubsection{Configurazione Zookeeper}
+Questa procedura va eseguita solamente sulla macchina denominata zookeeper.\\
+Eseguiamo l'installazione di Zookeeper tramite il comando:
+\begin{lstlisting}
+sudo apt-get install zookeeper
+\end{lstlisting}
+Dopodich\`e eseguiamo la configurazione del server Zookeper modificando il file \texttt{/etc/zookeeper/conf/zoo.cfg} in modo che contenga:
+\begin{lstlisting}
+tickTime=2000
+dataDir=/var/lib/zookeeper
+clientPort=2181
+# Enable regular purging of old data and transaction logs every 24 hours
+autopurge.purgeInterval=24
+autopurge.snapRetainCount=5
+\end{lstlisting}
+Quindi sar\`a necessario aggiungere zookeeper ai processi gestiti da supervisord, per fare ci\`o \`e necessario creare il file \texttt{/etc/supervisor/conf.d/zookeeper.conf} con il seguente contenuto:
+\begin{lstlisting}
+[program:zookeeper]
+command=/usr/share/zookeeper/bin/zkServer.sh start-foreground
+directory=/usr/share/zookeeper/bin/
+autorestart=true
+autostart=true
+\end{lstlisting}
+In questo modo supervisor eseguir\`a ad ogni reboot il server zookeeper (autostart = true) e ne eseguir\`a il restart nel caso esso termini inavvertitamente(autorestart = true).
+Per indicare a supervisor che deve gestire zookeeper \`e necessario eseguire:
+\begin{lstlisting}
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl start zookeeper
+\end{lstlisting}
+\subsubsection{Configurazione Apache Storm}
+Questa procedura andr\`a eseguita su tutte le macchine che eseguiranno il processo Storm, quindi sia nimbus che supervisor.
+Prima di tutto assicuriamoci di avere installati i tool di sviluppo necessari tramite:
+\begin{lstlisting}
+sudo apt-get install build-essential
+sudo apt-get install uuid-dev
+sudo apt-get install autoconf
+sudo apt-get install libtool
+sudo apt-get install pkg-config
+\end{lstlisting}
+Quindi installiamo ZeroMQ necessario per far funzionare Apache Storm:
+\begin{lstlisting}
+wget http://download.zeromq.org/zeromq-2.1.7.tar.gz
+tar -xzf zeromq-2.1.7.tar.gz
+cd zeromq-2.1.7
+./autogen.sh
+./configure
+make
+sudo make install
+\end{lstlisting}
+Quindi andiamo ad installare JZMQ, i binding java per zeroMQ:
+\begin{lstlisting}
+git clone http://github.com/zeromq/jzmq
+cd jzmq
+./autogen.sh
+./configure
+make
+sudo make install
+\end{lstlisting}
+Quindi installiamo Python 2.6.6 necessario per l'esecuzione del comando \texttt{storm}, per farlo installeremo pyenv e tramite esso installeremo python:
+\begin{lstlisting}
+curl -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
+export PATH="$HOME/.pyenv/bin:$PATH"
+eval "$(pyenv init -)"
+eval "$(pyenv init -)"
+sudo apt-get install libssl-dev 
+sudo apt-get install zlib1g-dev 
+sudo apt-get install libbz2-dev
+sudo apt-get install libreadline-dev 
+sudo apt-get install libsqlite3-dev
+sudo apt-get install llvm
+pyenv install 2.6.6
+pyenv global 2.6.6
+\end{lstlisting}
+Quindi eseguiamo il download e l'installazione della versione 0.9.4 di Apache Storm:
+\begin{lstlisting}
+wget http://it.apache.contactlab.it/storm/apache-storm-0.9.4/apache-storm-0.9.4.tar.gz
+tar -xvf apache-storm-0.9.4.tar.gz
+sudo mv apache-storm-0.9.4 /usr/local/
+sudo chown -R root:root /usr/local/apache-storm-0.9.4
+sudo ln -s /usr/local/storm-0.8.2 /usr/local/storm
+\end{lstlisting}
+\subsubsection{Configurazione nodo Nimbus}
+Relativamente al nodo nimbus modificheremo le impostazioni in modo che riflettano la nostra topologia di rete e porremo sotto supervisor i processi \texttt{storm nimbus} e \texttt{storm ui}.
+Il file \texttt{/usr/local/storm/conf/storm.yaml} dovr\`a contenere:
+\begin{lstlisting}
+storm.zookeeper.servers:
+    - "zkserver"
+nimbus.host: "nimbus"
+storm.local.dir: "/usr/local/storm/data"
+\end{lstlisting}
+Quindi andiamo a creare il file \texttt{/etc/supervisor/conf.d/nimbus.conf} con il seguente contenuto:
+\begin{lstlisting}
+[program:nimbus]
+command=/usr/local/storm/bin/storm nimbus
+directory=/usr/local/storm
+autorestart=true
+autostart=true
+priority=1
+\end{lstlisting}
+Ed il file \texttt{/etc/supervisor/conf.d/stormui.conf}:
+\begin{lstlisting}
+[program:stormui]
+command=/usr/local/storm/bin/storm ui
+directory=/usr/local/storm
+autorestart=true
+autostart=true
+priority=50
+\end{lstlisting}
+Quindi eseguiamo i comandi:
+\begin{lstlisting}
+sudo supervisorctl rereadsudo supervisorctl updatesudo supervisorctl start nimbus
+sudo supervisorctl start stormui
+\end{lstlisting}
+In questo modo verranno avviati automaticamente e riavviati in caso di crash i processi storm nimbus e storm ui.
+\subsubsection{Configurazione nodo slave}
+Relativamente al nodo slave modificheremo le impostazioni in modo che riflettano la nostra topologia di rete e porremo sotto supervisor il processo \texttt{storm supervisor}.
+Il file \texttt{/usr/local/storm/conf/storm.yaml} dovr\`a contenere:
+\begin{lstlisting}
+storm.zookeeper.servers:
+    - "zkserver"
+nimbus.host: "nimbus"
+storm.local.dir: "/usr/local/storm/data"
+supervisor.slots.ports: 
+    - 6700
+    - 6701
+\end{lstlisting}
+Quindi andiamo a creare il file \texttt{/etc/supervisor/conf.d/supervisor.conf} con il seguente contenuto:
+\begin{lstlisting}
+[program:supervisor]
+command=/usr/local/storm/bin/storm supervisor
+directory=/usr/local/storm
+autorestart=true
+autostart=true
+priority=1
+\end{lstlisting}
+Quindi eseguiamo i comandi:
+\begin{lstlisting}
+sudo supervisorctl rereadsudo supervisorctl updatesudo supervisorctl start supervisor
+\end{lstlisting}
+In questo modo verr\`a avviato automaticamente e riavviato in caso di crash il processo storm supervisor.
+\subsection{Configurazione Apache Jena Fuseki}
+Per la configurazione dell'endpoint SPARQL andremo ad installare Apache Jena Fuseki.
+\begin{lstlisting}
+wget http://apache.fastbull.org/jena/binaries/jena-fuseki1-1.1.2-distribution.tar.gz
+tar -xvf jena-fuseki1-1.1.2-distribution.tar.gz
+sudo mv jena-fuseki1-1.1.2-distribution /usr/local/
+sudo chown -R root:root /usr/local/jena-fuseki1-1.1.2-distribution
+sudo ln -s /usr/local/jena-fuseki1-1.1.2-distribution /usr/local/fuseki
+sudo mkdir /usr/local/fuseki/stormsmacs
+\end{lstlisting}
+Quindi andiamo a configurare supervisor per avviare automaticamente fuseki:
+\begin{lstlisting}
+[program:fuseki]
+command=/usr/local/fuseki/fuseki-server --update --loc=stormsmacs /ds
+directory=/usr/local/fuseki/
+stdout_logfile=/usr/local/fuseki/log.txt
+redirect_stderr=true
+autorestart=true
+autostart=true
+\end{lstlisting}
+E quindi:
+\begin{lstlisting}
+sudo supervisorctl rereadsudo supervisorctl updatesudo supervisorctl start fuseki
+\end{lstlisting}
+\subsection{Deployment di sigarAgent}
+Per il deployment di sigarAgent \`e necessario ottenere il jar sigarAgent.jar e le librerie necessarie al funzionamento di sigar (che non \`e possibile accorpare al file jar) ed eseguire:
+\begin{lstlisting}
+export LD_LIBRARY_PATH="nativelibs"
+sudo java -jar sigarAgent.jar
+\end{lstlisting}
+\subsection{Deployment di cfAgent}
+Per il deployment di cfAgent \`e necessario ottenere il jar cfAgent.jar ed eseguire:
+\begin{lstlisting}
+sudo java -jar sigarAgent.jar
+\end{lstlisting}
+\section{Esecuzione di Storm SMACS}
+Per avviare stormSMACS basta semplicemente eseguire sul nodo \emph{nimbus} il comando:
+\begin{lstlisting}
+storm jar storm-smacs-assembly-1.0.jar it.unibo.ing.stormsmacs.topologies.Topology confFile.json
+\end{lstlisting}
+\texttt{confFile.json} \`e il file che rappresenta la topologia delle macchine da monitorare.
+\newpage
+\appendix
+\section{Link delle repository dei progetti}
+\begin{itemize}
+\item stormSMACS: \url{http://github.com/tmnd1991/stormSMACS}
+\item ceilometerAPI4s \url{http://github.com/tmnd1991/ceilometerAPI4s/settings}\item scalaStorm \url{http://github.com/tmnd1991/scalaStorm}
+\item utils \url{http://github.com/tmnd1991/scalaUtils}\item cfAgent \url{http://github.com/tmnd1991/cfAgent}\item sigarAgent \url{http://github.com/tmnd1991/sigarAgent}
+\end{itemize}
+% For many users, the previous commands will be enough.
+% If you want to directly input Unicode, add an Input Menu or Keyboard to the menu bar 
+% using the International Panel in System Preferences.
+% Unicode must be typeset using a font containing the appropriate characters.
+% Remove the comment signs below for examples.
+
+% \newfontfamily{\A}{Geeza Pro}
+% \newfontfamily{\H}[Scale=0.9]{Lucida Grande}
+% \newfontfamily{\J}[Scale=0.85]{Osaka}
+
+% Here are some multilingual Unicode fonts: this is Arabic text: {\A السلام عليكم}, this is Hebrew: {\H שלום}, 
+% and here's some Japanese: {\J 今日は}.
+
+
+
+\end{document}  
